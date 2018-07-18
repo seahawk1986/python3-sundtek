@@ -19,34 +19,29 @@
 // sundtek.local_devices() in python
 static PyObject *sundtek_local_devices(PyObject *self, PyObject *args)
 {
-   // the sundtek libraries write error messages to stdout
-   // so we redirect it to stderr...
-   int old_stdout = dup(STDOUT_FILENO);
-   dup2(STDERR_FILENO, STDOUT_FILENO);
-
-   // obtain a connection to mediasrv
-   int fd = net_connect(0);
-
-   // switch back to "normal" stdout for dumping our JSON data after flushing remaining data
-   fflush(stdout);
-   dup2(old_stdout, STDOUT_FILENO);
-
+   int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
       return (PyObject *) NULL;
    }
-
+   
    PyObject *local_devices = PyDict_New();
    local_device_scan(fd, local_devices);
-
+   
+   net_close(fd); // close the connection to the local mediasrv
+   
    return local_devices;
 }
 
 // Actual module method definition - this is the code that will be called by
 // sundtek.network_devices() in python
 static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
+
+   // scan for all devices
+   void *fd = media_scan_network(ALLOCATE_DEVICE_OBJECT, NETWORK_SCAN_TIME);
    PyObject *network_devices = PyDict_New();
-   network_device_scan(network_devices);
+   network_device_scan(fd, network_devices);
+   media_scan_free(&fd);
    return network_devices;
 }
 
@@ -59,16 +54,23 @@ static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
 //ml_doc:  Contents of this method's docstring
 static PyMethodDef sundtek_methods[] = { 
     {   
-        "local_devices",
-        sundtek_local_devices,
-        METH_NOARGS,
-        "Returns available sundtek devices (either local or mounted) using the mcsimple api."
+	"local_devices",
+	sundtek_local_devices,
+	METH_NOARGS,
+	"returns available sundtek devices (either connected locally or mounted) using the mcsimple api."
     },  
     {   "network_devices",
 	sundtek_network_devices,
 	METH_NOARGS,
-	"Returns all network devices announced by other mediasrv instances"
+	"returns all network devices announced by other mediasrv instances"
     },
+    /*
+    {   "is_local_device",
+	sundtek_is_local_device,
+	METH_VARARGS,
+	"accepts either a device id (int) or a serial (str), returns True if a matching device is physically connected."
+    },
+    */
     {NULL, NULL, 0, NULL}
 };
 
@@ -96,10 +98,56 @@ PyMODINIT_FUNC PyInit_sundtek(void)
 
 // helper functions (actual implementation of the c api calls)
 
+int connect_sundtek_mediasrv(void) {
+   /* 
+    * obtains a connection to the sundtek mediasrv and returns a file desriptor
+    * if the connections fails fd is <= 0. You must close the connection
+    * by calling net_close(fd)
+    */
+
+   // the sundtek libraries write error messages to stdout
+   // so we redirect it to stderr...
+   int old_stdout = dup(STDOUT_FILENO);
+   dup2(STDERR_FILENO, STDOUT_FILENO);
+
+   // obtain a connection to mediasrv
+   int fd = net_connect(0);
+
+   // switch back to "normal" stdout for dumping our JSON data after flushing remaining data
+   fflush(stdout);
+   dup2(old_stdout, STDOUT_FILENO);
+
+   return fd;
+}
+
+int is_local_device(const char *serial) {
+   struct media_device_enum *device;
+   int device_index = 0;
+   int subdevice = 0;
+   int fd = connect_sundtek_mediasrv();
+   if (fd <= 0) // if the local mediasrv is not reachable it can't be a local device
+      return 0;
+   while((device=net_device_enum(fd, &device_index, subdevice))!=0) {   // multi frontend support???
+      do {
+	 if ((strcmp((const char*) device->serial, serial) == 0) &&
+             ((device->capabilities & MEDIA_REMOTE_DEVICE) == 0)) {
+	    net_close(fd);
+	    return 1;
+	 }
+	 free(device);
+	 device = NULL;
+      } while((device=net_device_enum(fd, &device_index, ++subdevice))!=0);
+      subdevice = 0;
+      device_index++;
+   }
+   net_close(fd);
+   return 0;
+}
+
 void local_device_scan(int fd, PyObject *local_devices) {
    /*
-    * Use a given fd to communicate with mediasrv.
-    * Iterate over all available devices (mounted or connected locally),
+    * use a given fd to communicate with mediasrv.
+    * iterate over all available devices (mounted or connected locally),
     * call device2dict to add their data to the dictionary* local_devices passed to the function.
     */
 
@@ -108,46 +156,47 @@ void local_device_scan(int fd, PyObject *local_devices) {
    int subdevice = 0;
    while((device=net_device_enum(fd, &device_index, subdevice))!=0) {   // multi frontend support???
       do {
-         device2dict(device, local_devices);
-         free(device);
-         device = NULL;
+	 device2dict(device, local_devices);
+	 free(device);
+	 device = NULL;
       } while((device=net_device_enum(fd, &device_index, ++subdevice))!=0);
       subdevice = 0;
       device_index++;
    }
 }
 
-void network_device_scan(PyObject *network_devices) {
+void network_device_scan(void *fd, PyObject *network_devices) {
    char *id = NULL;
    char *ip = NULL;
    char *name = NULL;
    char *serial = NULL;
    uint32_t *cap = NULL;
-
-   // scan for all devices
-   void *obj = media_scan_network(ALLOCATE_DEVICE_OBJECT, NETWORK_SCAN_TIME);
+   uint32_t net_cap;
 
    int n = 0;
-   while (media_scan_info(obj, n, "ip", (void**) &ip) == 0) {
-      media_scan_info(obj, n, "capabilities", (void**) &cap);
-      media_scan_info(obj, n, "devicename",   (void**) &name);
-      media_scan_info(obj, n, "id",           (void**) &id);
-      media_scan_info(obj, n, "serial",       (void**) &serial);
+   while (media_scan_info(fd, n, "ip", (void**) &ip) == 0) {
+      media_scan_info(fd, n, "serial",       (void**) &serial);
+      if (!is_local_device(serial)) {
+	  media_scan_info(fd, n, "capabilities", (void**) &cap);
+	  media_scan_info(fd, n, "devicename",   (void**) &name);
+	  media_scan_info(fd, n, "id",           (void**) &id);
 
-      PyObject *capabilities = PyDict_New();
-      capabilities2dict(*cap, capabilities);
+	  PyObject *capabilities = PyDict_New();
 
-      PyObject *sundtek_device = PyDict_New();
-      PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
-      PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
-      PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
-      PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
-      PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
+	  net_cap = *cap | (uint32_t) MEDIA_REMOTE_DEVICE; // mark all devices as network devices
+	  capabilities2dict(net_cap, capabilities);
 
-      PyDict_SetItemString(network_devices, serial, sundtek_device);
+	  PyObject *sundtek_device = PyDict_New();
+	  PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
+	  PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
+	  PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
+	  PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
+	  PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
+
+	  PyDict_SetItemString(network_devices, serial, sundtek_device);
+      }
       n++;
    }
-   media_scan_free(&obj);
 }
 
 void capabilities2dict(const uint32_t cap, PyObject *capabilities) {
