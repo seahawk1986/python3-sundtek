@@ -266,12 +266,18 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "id",            Py_BuildValue("i", device->id));
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
-   PyDict_SetItemString(sundtek_device, "ir_protocols",  get_ir_protocols((char*)device->frontend_node));
+
+   if ((char*)device->remote_node != NULL) {
+   PyDict_SetItemString(sundtek_device, "supports_ir_config", PyBool_FromLong(
+                          accepts_ir_config((char*)device->frontend_node)));
+   } else {
+      PyDict_SetItemString(sundtek_device, "supports_ir_config", Py_False);
+   }
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
 
-static PyObject *get_ir_protocols(char *frontend_path) {
+int accepts_ir_config(char *frontend_path) {
 	/*
 	 * Takes a path to a dvb frontend (e.g. /dev/dvb/adapter0/frontend0) and
 	 * returns an array of supported IR protocols
@@ -283,16 +289,13 @@ static PyObject *get_ir_protocols(char *frontend_path) {
 	 *  else we return full protocol support
 	 */
 
-	PyObject *ir_protocols;
 	int fd = net_open(frontend_path, O_RDONLY);
-	struct media_ir_enum ir_enum[0]; // for some reason the sundtek api wants an array with one element
+	struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with one element
 	int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
-	if (response == 0) {
-	   ir_protocols = Py_BuildValue("(ssss)", "NEC", "RC5", "RC6", "RC6A");
-        } else {
-	   ir_protocols = Py_BuildValue("(s)", "NEC");
-	}
-
 	net_close(fd);
-	return ir_protocols;
+	if (response == 0) {
+           return 1;
+        } else {
+           return 0;
+	}
 }

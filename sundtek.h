@@ -5,7 +5,7 @@ static PyObject *sundtek_local_devices(PyObject *self, PyObject *args);
 static PyObject *sundtek_network_devices(PyObject *self, PyObject *args);
 int connect_sundtek_mediasrv(void);
 int is_local_device(const char *serial);
-static PyObject *get_ir_protocols(char *frontend_path);
+int accepts_ir_config(char *frontend_path);
 void local_device_scan(int fd, PyObject *local_devices);
 void network_device_scan(void *fd, PyObject *network_devices);
 void device2dict(struct media_device_enum *device, PyObject *local_devices);
