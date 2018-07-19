@@ -165,14 +165,14 @@ int is_local_device(const char *serial) {
    while((device=net_device_enum(fd, &device_index, subdevice))!=0) {   // multi frontend support???
       do {
 	 if ((strcmp((const char*) device->serial, serial) == 0) &&
-             ((device->capabilities & MEDIA_REMOTE_DEVICE) == 0)) {
+             ((device->capabilities & MEDIA_REMOTE_DEVICE)  > 0)) {
 	    net_close(fd);
 	    return 1;
 	 }
 	 free(device);
 	 device = NULL;
       } while((device=net_device_enum(fd, &device_index, ++subdevice))!=0);
-      subdevice = 0;
+      subdevice = 1;
       device_index++;
    }
    net_close(fd);
@@ -211,25 +211,24 @@ void network_device_scan(void *fd, PyObject *network_devices) {
    int n = 0;
    while (media_scan_info(fd, n, "ip", (void**) &ip) == 0) {
       media_scan_info(fd, n, "serial",       (void**) &serial);
-      if (!is_local_device(serial)) {
-	  media_scan_info(fd, n, "capabilities", (void**) &cap);
-	  media_scan_info(fd, n, "devicename",   (void**) &name);
-	  media_scan_info(fd, n, "id",           (void**) &id);
+      media_scan_info(fd, n, "capabilities", (void**) &cap);
+      media_scan_info(fd, n, "devicename",   (void**) &name);
+      media_scan_info(fd, n, "id",           (void**) &id);
+    
+      PyObject *capabilities = PyDict_New();
+    
+      net_cap = *cap | (uint32_t) MEDIA_REMOTE_DEVICE; // mark all devices as network devices
+      capabilities2dict(net_cap, capabilities);
+    
+      PyObject *sundtek_device = PyDict_New();
+      PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
+      PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
+      PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
+      PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
+      PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
+      PyDict_SetItemString(sundtek_device, "mounted",      PyBool_FromLong(is_local_device(serial)));
 
-	  PyObject *capabilities = PyDict_New();
-
-	  net_cap = *cap | (uint32_t) MEDIA_REMOTE_DEVICE; // mark all devices as network devices
-	  capabilities2dict(net_cap, capabilities);
-
-	  PyObject *sundtek_device = PyDict_New();
-	  PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
-	  PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
-	  PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
-	  PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
-	  PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
-
-	  PyDict_SetItemString(network_devices, serial, sundtek_device);
-      }
+      PyDict_SetItemString(network_devices, serial, sundtek_device);
       n++;
    }
 }
@@ -257,6 +256,10 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
     * to the local_devices object.
     */
 
+   if ((device->capabilities & MEDIA_REMOTE_DEVICE) > 0) {
+      return;
+   }
+
    PyObject *capabilities = PyDict_New();
    capabilities2dict(device->capabilities, capabilities);
 
@@ -283,7 +286,7 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
 
-int set_ir_protcol(int ir_protocol, char *frontend_node) {
+int set_ir_protocol(int ir_protocol, char *frontend_node) {
    /*
     * takes the ir protocol number and the frontend node
     * to set the ir protocol (this can fail without error,
