@@ -24,12 +24,12 @@ static PyObject *sundtek_local_devices(PyObject *self, PyObject *args)
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
       return (PyObject *) NULL;
    }
-   
+
    PyObject *local_devices = PyDict_New();
    local_device_scan(fd, local_devices);
-   
+
    net_close(fd); // close the connection to the local mediasrv
-   
+
    return local_devices;
 }
 
@@ -45,6 +45,29 @@ static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
    return network_devices;
 }
 
+static PyObject *sundtek_enable_network(void) {
+   int fd = connect_sundtek_mediasrv();
+   if (fd <= 0) {
+      PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
+      return (PyObject *) NULL;
+   }
+
+   net_enablenetwork(1);
+   net_close(fd);
+   Py_RETURN_NONE;
+}
+
+static PyObject *sundtek_disable_network(void) {
+   int fd = connect_sundtek_mediasrv();
+   if (fd <= 0) {
+      PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
+      return (PyObject *) NULL;
+   }
+
+   net_enablenetwork(0);
+   net_close(fd);
+   Py_RETURN_NONE;
+}
 //Method definition object for this extension, these argumens mean:
 //ml_name: The name of the method
 //ml_meth: Function pointer to the method implementation
@@ -52,17 +75,29 @@ static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
 //          accepting arguments, accepting keyword arguments, being a
 //          class method, or being a static method of a class.
 //ml_doc:  Contents of this method's docstring
-static PyMethodDef sundtek_methods[] = { 
-    {   
+static PyMethodDef sundtek_methods[] = {
+    {
 	"local_devices",
 	sundtek_local_devices,
 	METH_NOARGS,
 	"returns available sundtek devices (either connected locally or mounted) using the mcsimple api."
-    },  
+    },
     {   "network_devices",
 	sundtek_network_devices,
 	METH_NOARGS,
 	"returns all network devices announced by other mediasrv instances"
+    },
+    {
+        "enable_network",
+	sundtek_enable_network,
+	METH_NOARGS,
+	"enable network sharing of local sundtek devices"
+    },
+    {
+        "disable_network",
+	sundtek_disable_network,
+	METH_NOARGS,
+	"disable network sharing of local sundtek devices"
     },
     /*
     {   "is_local_device",
@@ -77,11 +112,11 @@ static PyMethodDef sundtek_methods[] = {
 //Module definition
 //The arguments of this structure tell Python what to call your extension,
 //what it's methods are and where to look for it's method definitions
-static struct PyModuleDef sundtek_definition = { 
+static struct PyModuleDef sundtek_definition = {
     PyModuleDef_HEAD_INIT,
     "sundtek",
     "A Python module that calls the sundtek API from C code.",
-    -1, 
+    -1,
     sundtek_methods
 };
 
@@ -99,7 +134,7 @@ PyMODINIT_FUNC PyInit_sundtek(void)
 // helper functions (actual implementation of the c api calls)
 
 int connect_sundtek_mediasrv(void) {
-   /* 
+   /*
     * obtains a connection to the sundtek mediasrv and returns a file desriptor
     * if the connections fails fd is <= 0. You must close the connection
     * by calling net_close(fd)
@@ -222,15 +257,15 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
     * to the local_devices object.
     */
 
-   PyObject *capabilities = PyDict_New(); 
+   PyObject *capabilities = PyDict_New();
    capabilities2dict(device->capabilities, capabilities);
 
-   PyObject *sundtek_device = PyDict_New(); 
+   PyObject *sundtek_device = PyDict_New();
    PyDict_SetItemString(sundtek_device, "capabilities",  capabilities);
    PyDict_SetItemString(sundtek_device, "devicename",    Py_BuildValue("s", (char*)device->devicename));
    PyDict_SetItemString(sundtek_device, "id",            Py_BuildValue("i", device->id));
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
-   
+
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
