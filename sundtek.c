@@ -267,17 +267,17 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
 
-   PyObject *remote = PyDict_New();
-   if ((char*)device->remote_node != NULL) {
-      PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_NEC), Py_BuildValue("s", "NEC"));
+   PyObject *ir_protocols = PyDict_New();
+   if ((device->capabilities & MEDIA_REMOTE)  != 0) {
+      PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_NEC), Py_BuildValue("s", "NEC"));
 
       if (!only_NEC_support((char*)device->frontend_node)) {
-         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC5),        Py_BuildValue("s", "RC5"));
-         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC6_MODE0),  Py_BuildValue("s", "RC6"));
-         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC6_MODE6A), Py_BuildValue("s", "RC6A"));
+         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC5),        Py_BuildValue("s", "RC5"));
+         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC6_MODE0),  Py_BuildValue("s", "RC6"));
+         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC6_MODE6A), Py_BuildValue("s", "RC6A"));
       }
-   PyDict_SetItemString(sundtek_device, "remote", remote);
    }
+   PyDict_SetItemString(sundtek_device, "ir_protocols", ir_protocols);
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
