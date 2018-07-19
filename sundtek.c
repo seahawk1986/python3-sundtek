@@ -45,7 +45,7 @@ static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
    return network_devices;
 }
 
-static PyObject *sundtek_enable_network(void) {
+static PyObject *sundtek_enable_network(PyObject *self, PyObject *args) {
    int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
@@ -57,7 +57,7 @@ static PyObject *sundtek_enable_network(void) {
    Py_RETURN_NONE;
 }
 
-static PyObject *sundtek_disable_network(void) {
+static PyObject *sundtek_disable_network(PyObject *self, PyObject *args) {
    int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
@@ -266,7 +266,7 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "id",            Py_BuildValue("i", device->id));
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
-   PyDict_SetItemString(sundtek_device, "ir_protocols",  get_ir_protocols(device->frontend_node));
+   PyDict_SetItemString(sundtek_device, "ir_protocols",  get_ir_protocols((char*)device->frontend_node));
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
