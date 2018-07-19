@@ -267,35 +267,37 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
 
+   PyObject *remote = PyDict_New();
    if ((char*)device->remote_node != NULL) {
-   PyDict_SetItemString(sundtek_device, "supports_ir_config", PyBool_FromLong(
-                          accepts_ir_config((char*)device->frontend_node)));
-   } else {
-      PyDict_SetItemString(sundtek_device, "supports_ir_config", Py_False);
+      PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_NEC), Py_BuildValue("s", "NEC"));
+
+      if (!only_NEC_support((char*)device->frontend_node)) {
+         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC5),        Py_BuildValue("s", "RC5"));
+         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC6_MODE0),  Py_BuildValue("s", "RC6"));
+         PyDict_SetItem(remote, PyLong_FromLong(IR_PROTO_RC6_MODE6A), Py_BuildValue("s", "RC6A"));
+      }
+   PyDict_SetItemString(sundtek_device, "remote", remote);
    }
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
 
-int accepts_ir_config(char *frontend_path) {
-	/*
-	 * Takes a path to a dvb frontend (e.g. /dev/dvb/adapter0/frontend0) and
-	 * returns an array of supported IR protocols
-	 * As far as I understand there are two possibilites:
-	 *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
-	 *  - newer sticks only support their NEC hardware devoder
-	 *
-	 *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume that we got a newer stick
-	 *  else we return full protocol support
-	 */
+int only_NEC_support(char *frontend_node) {
+   /*
+    * As far as I understand there are two possibilites:
+    *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
+    *  - newer sticks only support their NEC hardware devoder
+    *
+    *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume that we got a newer stick
+    *  else that for more protocols are supported
+    */
 
-	int fd = net_open(frontend_path, O_RDONLY);
-	struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with one element
-	int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
-	net_close(fd);
-	if (response == 0) {
-           return 1;
-        } else {
-           return 0;
-	}
+   int fd = net_open(frontend_node, O_RDWR);
+   if (fd >=0) {
+       struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with one element
+       int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
+       net_close(fd);
+       return (response != 0);
+       }
+   return 1;
 }

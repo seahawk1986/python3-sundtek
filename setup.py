@@ -3,7 +3,7 @@ from distutils.core import setup, Extension
 sundtek = Extension(
     'sundtek',
     sources=['sundtek.c'],
-    extra_link_args=['-L/opt/lib', '-lmcsimple', '-lmediaclient'],
+    extra_link_args=['-L/opt/lib', '-lmcsimple'],
     extra_compile_args=['-Wall'],
     )
 
