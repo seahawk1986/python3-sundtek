@@ -284,6 +284,13 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
 }
 
 int set_ir_protcol(int ir_protocol, char *frontend_node) {
+   /*
+    * takes the ir protocol number and the frontend node
+    * to set the ir protocol (this can fail without error,
+    * if the device does not support setting a valid protocol).
+    */
+
+
    int fd = net_open(frontend_node, O_RDWR);
    if (fd > 0) {
       struct media_ir_config ir_config;
@@ -307,7 +314,7 @@ int only_NEC_support(char *frontend_node) {
    /*
     * As far as I understand there are two possibilites:
     *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
-    *  - newer sticks only support their NEC hardware devoder
+    *  - newer sticks only support their NEC using a hardware decoder
     *
     *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume that we got a newer stick
     *  else that for more protocols are supported
