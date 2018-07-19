@@ -4,7 +4,7 @@
 static PyObject *sundtek_local_devices(PyObject *self, PyObject *args);
 static PyObject *sundtek_network_devices(PyObject *self, PyObject *args);
 int connect_sundtek_mediasrv(void);
-int is_local_device(const char *serial);
+int device_type(const char *serial);
 int only_NEC_support(char *frontend_path);
 void local_device_scan(int fd, PyObject *local_devices);
 void network_device_scan(void *fd, PyObject *network_devices);

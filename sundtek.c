@@ -160,7 +160,7 @@ int connect_sundtek_mediasrv(void) {
    return fd;
 }
 
-int device_flags(const char *serial) {
+int device_type(const char *serial) {
    struct media_device_enum *device;
    int device_index = 0;
    int subdevice;
@@ -201,7 +201,7 @@ int device_flags(const char *serial) {
 void local_device_scan(int fd, PyObject *local_devices) {
    /*
     * use a given fd to communicate with mediasrv.
-    * iterate over all available devices (mounted or connected locally),
+    * iterate over all local devices,
     * call device2dict to add their data to the dictionary* local_devices passed to the function.
     */
 
@@ -220,6 +220,10 @@ void local_device_scan(int fd, PyObject *local_devices) {
 }
 
 void network_device_scan(void *fd, PyObject *network_devices) {
+   /*
+    * takes a fd returned my media_scan_network(), fills network_devices with
+    * devices announced by non-local mediasrv instances.
+    */
    char *id = NULL;
    char *ip = NULL;
    char *name = NULL;
@@ -230,8 +234,8 @@ void network_device_scan(void *fd, PyObject *network_devices) {
    int n = 0;
    while (media_scan_info(fd, n, "ip", (void**) &ip) == 0) {
       media_scan_info(fd, n, "serial", (void**) &serial);
-      int device_flags_result = device_flags(serial);
-      if (device_flags_result > LOCAL_DEVICE) {
+      int device_type_result = device_type(serial);
+      if (device_type_result > LOCAL_DEVICE) {
          media_scan_info(fd, n, "capabilities", (void**) &cap);
          media_scan_info(fd, n, "devicename",   (void**) &name);
          media_scan_info(fd, n, "id",           (void**) &id);
@@ -247,7 +251,7 @@ void network_device_scan(void *fd, PyObject *network_devices) {
          PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
          PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
          PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
-         PyDict_SetItemString(sundtek_device, "mounted",      PyBool_FromLong((device_flags_result == MOUNTED_NETWORK_DEVICE)));
+         PyDict_SetItemString(sundtek_device, "mounted",      PyBool_FromLong((device_type_result == MOUNTED_NETWORK_DEVICE)));
 
          PyDict_SetItemString(network_devices, serial, sundtek_device);
       }
