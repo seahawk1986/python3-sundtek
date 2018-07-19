@@ -263,8 +263,9 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyObject *sundtek_device = PyDict_New();
    PyDict_SetItemString(sundtek_device, "capabilities",  capabilities);
    PyDict_SetItemString(sundtek_device, "devicename",    Py_BuildValue("s", (char*)device->devicename));
+   PyDict_SetItemString(sundtek_device, "frontend_node", Py_BuildValue("s", (char*)device->frontend_node));
    PyDict_SetItemString(sundtek_device, "id",            Py_BuildValue("i", device->id));
-   PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
+   PyDict_SetItemString(sundtek_device, "remote_node",   Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
 
    PyObject *ir_protocols = PyDict_New();
@@ -282,6 +283,26 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
 
+int set_ir_protcol(int ir_protocol, char *frontend_node) {
+   int fd = net_open(frontend_node, O_RDWR);
+   if (fd > 0) {
+      struct media_ir_config ir_config;
+      ir_config.protocol = ir_protocol;
+      ir_config.nec_parity = 0;
+      ir_config.rc6_mode = 0;
+      int response = net_ioctl(fd, DEVICE_CONFIG_IR, &ir_config);
+      /*
+      printf("response settings protocol: %d\n"
+             " - data.protocol: %d\n"
+             " - data.nec_parity: %d\n"
+             " - data.rc6_mode: %d\n", response, ir_config.protocol, ir_config.nec_parity, ir_config.rc6_mode);
+      */
+      net_close(fd);
+      return (response == 0);
+   }
+   return 0;
+}
+
 int only_NEC_support(char *frontend_node) {
    /*
     * As far as I understand there are two possibilites:
@@ -293,8 +314,8 @@ int only_NEC_support(char *frontend_node) {
     */
 
    int fd = net_open(frontend_node, O_RDWR);
-   if (fd >=0) {
-       struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with one element
+   if (fd >0) {
+       struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with more than one element
        int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
        net_close(fd);
        return (response != 0);
