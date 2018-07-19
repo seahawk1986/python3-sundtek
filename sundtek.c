@@ -283,16 +283,15 @@ static PyObject *get_ir_protocols(char *frontend_path) {
 	 *  else we return full protocol support
 	 */
 
-	PyObject *ir_protocols = PyList_New(0);
-	PyList_Append(ir_protocols, Py_BuildValue("s", "NEC"));
+	PyObject *ir_protocols;
 	int fd = net_open(frontend_path, O_RDONLY);
 	struct media_ir_enum ir_enum[0]; // for some reason the sundtek api wants an array with one element
 	int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
 	if (response == 0) {
-	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC5"));
-	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC6"));
-	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC6A"));
-        }
+	   ir_protocols = Py_BuildValue("(ssss)", "NEC", "RC5", "RC6", "RC6A");
+        } else {
+	   ir_protocols = Py_BuildValue("(s)", "NEC");
+	}
 
 	net_close(fd);
 	return ir_protocols;
