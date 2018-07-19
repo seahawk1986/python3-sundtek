@@ -15,6 +15,11 @@
 #define ALLOCATE_DEVICE_OBJECT 1   // allocate device objects when running media_scan_network
 #define NETWORK_SCAN_TIME 700      // Why 700 ms? It seems to work...
 
+// for marking local devices and mounted network devices
+#define LOCAL_DEVICE 0
+#define NETWORK_DEVICE 2
+#define MOUNTED_NETWORK_DEVICE 4
+
 // Actual module method definition - this is the code that will be called by
 // sundtek.local_devices() in python
 static PyObject *sundtek_local_devices(PyObject *self, PyObject *args)
@@ -155,28 +160,42 @@ int connect_sundtek_mediasrv(void) {
    return fd;
 }
 
-int is_local_device(const char *serial) {
+int device_flags(const char *serial) {
    struct media_device_enum *device;
    int device_index = 0;
-   int subdevice = 0;
+   int subdevice;
    int fd = connect_sundtek_mediasrv();
-   if (fd <= 0) // if the local mediasrv is not reachable it can't be a local device
-      return 0;
-   while((device=net_device_enum(fd, &device_index, subdevice))!=0) {   // multi frontend support???
-      do {
-	 if ((strcmp((const char*) device->serial, serial) == 0) &&
-             ((device->capabilities & MEDIA_REMOTE_DEVICE)  > 0)) {
-	    net_close(fd);
-	    return 1;
-	 }
-	 free(device);
-	 device = NULL;
-      } while((device=net_device_enum(fd, &device_index, ++subdevice))!=0);
-      subdevice = 1;
+   int device_type = NETWORK_DEVICE;
+   if (fd <= 0) { // if the local mediasrv is not reachable it can't be a local device
+      return device_type;
+   }
+   while (1) {
+      subdevice = 0;
+      while (1) {
+         device = net_device_enum(fd, &device_index, subdevice);
+         if (!device)
+            break;
+         if (strcmp((const char*)device->serial, serial) == 0) {
+             if ((device->capabilities & MEDIA_REMOTE_DEVICE) > 0) {
+                device_type = MOUNTED_NETWORK_DEVICE;
+                goto close;
+             } else {
+                device_type = LOCAL_DEVICE;
+                goto close;
+             }
+         }         subdevice++;
+         free(device);
+         device = NULL;
+      }
+      if (subdevice == 0)
+         break;
       device_index++;
    }
+   close:
+      if (device)
+         free(device);
    net_close(fd);
-   return 0;
+   return device_type;
 }
 
 void local_device_scan(int fd, PyObject *local_devices) {
@@ -210,25 +229,28 @@ void network_device_scan(void *fd, PyObject *network_devices) {
 
    int n = 0;
    while (media_scan_info(fd, n, "ip", (void**) &ip) == 0) {
-      media_scan_info(fd, n, "serial",       (void**) &serial);
-      media_scan_info(fd, n, "capabilities", (void**) &cap);
-      media_scan_info(fd, n, "devicename",   (void**) &name);
-      media_scan_info(fd, n, "id",           (void**) &id);
+      media_scan_info(fd, n, "serial", (void**) &serial);
+      int device_flags_result = device_flags(serial);
+      if (device_flags_result > LOCAL_DEVICE) {
+         media_scan_info(fd, n, "capabilities", (void**) &cap);
+         media_scan_info(fd, n, "devicename",   (void**) &name);
+         media_scan_info(fd, n, "id",           (void**) &id);
     
-      PyObject *capabilities = PyDict_New();
+         PyObject *capabilities = PyDict_New();
     
-      net_cap = *cap | (uint32_t) MEDIA_REMOTE_DEVICE; // mark all devices as network devices
-      capabilities2dict(net_cap, capabilities);
+         net_cap = *cap | (uint32_t) MEDIA_REMOTE_DEVICE; // mark all devices as network devices
+         capabilities2dict(net_cap, capabilities);
     
-      PyObject *sundtek_device = PyDict_New();
-      PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
-      PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
-      PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
-      PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
-      PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
-      PyDict_SetItemString(sundtek_device, "mounted",      PyBool_FromLong(is_local_device(serial)));
+         PyObject *sundtek_device = PyDict_New();
+         PyDict_SetItemString(sundtek_device, "capabilities", capabilities);
+         PyDict_SetItemString(sundtek_device, "devicename",   Py_BuildValue("s", name));
+         PyDict_SetItemString(sundtek_device, "id",           Py_BuildValue("i", (atoi(id))));
+         PyDict_SetItemString(sundtek_device, "ip",           Py_BuildValue("s", ip));
+         PyDict_SetItemString(sundtek_device, "serial",       Py_BuildValue("s", serial));
+         PyDict_SetItemString(sundtek_device, "mounted",      PyBool_FromLong((device_flags_result == MOUNTED_NETWORK_DEVICE)));
 
-      PyDict_SetItemString(network_devices, serial, sundtek_device);
+         PyDict_SetItemString(network_devices, serial, sundtek_device);
+      }
       n++;
    }
 }
