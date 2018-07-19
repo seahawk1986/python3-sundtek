@@ -266,6 +266,34 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "id",            Py_BuildValue("i", device->id));
    PyDict_SetItemString(sundtek_device, "remote_device", Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
+   PyDict_SetItemString(sundtek_device, "ir_protocols",  get_ir_protocols(device->frontend_node));
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
+}
+
+static PyObject *get_ir_protocols(char *frontend_path) {
+	/*
+	 * Takes a path to a dvb frontend (e.g. /dev/dvb/adapter0/frontend0) and
+	 * returns an array of supported IR protocols
+	 * As far as I understand there are two possibilites:
+	 *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
+	 *  - newer sticks only support their NEC hardware devoder
+	 *
+	 *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume that we got a newer stick
+	 *  else we return full protocol support
+	 */
+
+	PyObject *ir_protocols = PyList_New(0);
+	PyList_Append(ir_protocols, Py_BuildValue("s", "NEC"));
+	int fd = net_open(frontend_path, O_RDONLY);
+	struct media_ir_enum ir_enum[0]; // for some reason the sundtek api wants an array with one element
+	int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
+	if (response == 0) {
+	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC5"));
+	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC6"));
+	   PyList_Append(ir_protocols, Py_BuildValue("s", "RC6A"));
+        }
+
+	net_close(fd);
+	return ir_protocols;
 }
