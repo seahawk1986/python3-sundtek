@@ -1,8 +1,8 @@
 #ifndef sundtek_python_wrapper_H
 #define sundtek_python_wrapper_H
 
-static PyObject *sundtek_local_devices(PyObject *self, PyObject *args);
-static PyObject *sundtek_network_devices(PyObject *self, PyObject *args);
+static PyObject *sundtek_api_local_devices(PyObject *self, PyObject *args);
+static PyObject *sundtek_api_network_devices(PyObject *self, PyObject *args);
 int connect_sundtek_mediasrv(void);
 int device_type(const char *serial);
 int only_NEC_support(char *frontend_path);
