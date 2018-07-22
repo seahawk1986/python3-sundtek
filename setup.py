@@ -1,14 +1,14 @@
 from distutils.core import setup, Extension
 
 sundtek = Extension(
-    'sundtek',
-    sources=['sundtek.c'],
+    'sundtek_api',
+    sources=['sundtek_api.c'],
     extra_link_args=['-L/opt/lib', '-lmcsimple'],
     extra_compile_args=['-Wall'],
     )
 
 setup(
-    name='sundtek',
+    name='sundtek_api',
     version='1.0',
     description='Python Package which wraps some mediasrv api functions',
     ext_modules=[sundtek],

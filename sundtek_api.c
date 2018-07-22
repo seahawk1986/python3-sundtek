@@ -9,7 +9,7 @@
 #include <sundtek/mediacmds.h>
 #include <sundtek/mediaclient.h>
 
-#include "sundtek.h"
+#include "sundtek_api.h"
 
 // The following definitions are needed for sundtek api calls:
 #define ALLOCATE_DEVICE_OBJECT 1   // allocate device objects when running media_scan_network
@@ -22,7 +22,7 @@
 
 // Actual module method definition - this is the code that will be called by
 // sundtek.local_devices() in python
-static PyObject *sundtek_local_devices(PyObject *self, PyObject *args)
+static PyObject *sundtek_api_local_devices(PyObject *self, PyObject *args)
 {
    int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
@@ -40,7 +40,7 @@ static PyObject *sundtek_local_devices(PyObject *self, PyObject *args)
 
 // Actual module method definition - this is the code that will be called by
 // sundtek.network_devices() in python
-static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
+static PyObject *sundtek_api_network_devices(PyObject *self, PyObject *args) {
 
    // scan for all devices
    void *fd = media_scan_network(ALLOCATE_DEVICE_OBJECT, NETWORK_SCAN_TIME);
@@ -50,7 +50,7 @@ static PyObject *sundtek_network_devices(PyObject *self, PyObject *args) {
    return network_devices;
 }
 
-static PyObject *sundtek_enable_network(PyObject *self, PyObject *args) {
+static PyObject *sundtek_api_enable_network(PyObject *self, PyObject *args) {
    int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
@@ -62,7 +62,7 @@ static PyObject *sundtek_enable_network(PyObject *self, PyObject *args) {
    Py_RETURN_NONE;
 }
 
-static PyObject *sundtek_disable_network(PyObject *self, PyObject *args) {
+static PyObject *sundtek_api_disable_network(PyObject *self, PyObject *args) {
    int fd = connect_sundtek_mediasrv();
    if (fd <= 0) {
       PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
@@ -80,33 +80,33 @@ static PyObject *sundtek_disable_network(PyObject *self, PyObject *args) {
 //          accepting arguments, accepting keyword arguments, being a
 //          class method, or being a static method of a class.
 //ml_doc:  Contents of this method's docstring
-static PyMethodDef sundtek_methods[] = {
+static PyMethodDef sundtek_api_methods[] = {
     {
 	"local_devices",
-	sundtek_local_devices,
+	sundtek_api_local_devices,
 	METH_NOARGS,
 	"returns available sundtek devices (either connected locally or mounted) using the mcsimple api."
     },
     {   "network_devices",
-	sundtek_network_devices,
+	sundtek_api_network_devices,
 	METH_NOARGS,
 	"returns all network devices announced by other mediasrv instances"
     },
     {
         "enable_network",
-	sundtek_enable_network,
+	sundtek_api_enable_network,
 	METH_NOARGS,
 	"enable network sharing of local sundtek devices"
     },
     {
         "disable_network",
-	sundtek_disable_network,
+	sundtek_api_disable_network,
 	METH_NOARGS,
 	"disable network sharing of local sundtek devices"
     },
     /*
     {   "is_local_device",
-	sundtek_is_local_device,
+	sundtek_api_is_local_device,
 	METH_VARARGS,
 	"accepts either a device id (int) or a serial (str), returns True if a matching device is physically connected."
     },
@@ -117,23 +117,23 @@ static PyMethodDef sundtek_methods[] = {
 //Module definition
 //The arguments of this structure tell Python what to call your extension,
 //what it's methods are and where to look for it's method definitions
-static struct PyModuleDef sundtek_definition = {
+static struct PyModuleDef sundtek_api_definition = {
     PyModuleDef_HEAD_INIT,
-    "sundtek",
+    "sundtek_api",
     "A Python module that calls the sundtek API from C code.",
     -1,
-    sundtek_methods
+    sundtek_api_methods
 };
 
 //Module initialization
 //Python calls this function when importing your extension. It is important
 //that this function is named PyInit_[[your_module_name]] exactly, and matches
 //the name keyword argument in setup.py's setup() call.
-PyMODINIT_FUNC PyInit_sundtek(void)
+PyMODINIT_FUNC PyInit_sundtek_api(void)
 {
     Py_Initialize();
 
-    return PyModule_Create(&sundtek_definition);
+    return PyModule_Create(&sundtek_api_definition);
 }
 
 // helper functions (actual implementation of the c api calls)
@@ -279,7 +279,7 @@ void capabilities2dict(const uint32_t cap, PyObject *capabilities) {
 void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    /*
     * Take a media_device_enum and add the data transformed into python dicts
-    * to the local_devices object.
+    * to the local_devices object if it is a local device
     */
 
    if ((device->capabilities & MEDIA_REMOTE_DEVICE) > 0) {

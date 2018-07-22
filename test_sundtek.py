@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-import sundtek
+import sundtek_api
 
 try:
-    devices = sundtek.local_devices()
+    devices = sundtek_api.local_devices()
 except (ConnectionError):
     pass
 else:
