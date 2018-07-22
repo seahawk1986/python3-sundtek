@@ -10,4 +10,4 @@ else:
     print(devices)
 
 print("Network Devices:")
-print(sundtek.network_devices())
+print(sundtek_api.network_devices())
