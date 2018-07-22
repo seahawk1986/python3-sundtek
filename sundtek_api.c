@@ -270,7 +270,12 @@ void capabilities2dict(const uint32_t cap, PyObject *capabilities) {
    PyDict_SetItemString(capabilities, "dvbs2",            PyBool_FromLong(cap & MEDIA_DVBS2));
    PyDict_SetItemString(capabilities, "dvbt",             PyBool_FromLong(cap & MEDIA_DVBT));
    PyDict_SetItemString(capabilities, "dvbt2",            PyBool_FromLong(cap & MEDIA_DVBT2));
-   PyDict_SetItemString(capabilities, "initial_dvb_mode", PyBool_FromLong(cap & MEDIA_DIGITAL_TV));
+   PyObject *initial_dvb_mode = PyDict_New();
+   if ((cap & MEDIA_DIGITAL_TV) > 0) {
+    PyDict_SetItemString(initial_dvb_mode, "DVB-C", Py_BuildValue("s", "DVBC"));
+    PyDict_SetItemString(initial_dvb_mode, "DVB-T", Py_BuildValue("s", "DVBT"));
+   }
+   PyDict_SetItemString(capabilities, "initial_dvb_mode", initial_dvb_mode);
    PyDict_SetItemString(capabilities, "network_device",   PyBool_FromLong(cap & MEDIA_REMOTE_DEVICE));
    PyDict_SetItemString(capabilities, "radio",            PyBool_FromLong(cap & MEDIA_RADIO));
    PyDict_SetItemString(capabilities, "remote",           PyBool_FromLong(cap & MEDIA_REMOTE));
@@ -299,12 +304,12 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
 
    PyObject *ir_protocols = PyDict_New();
    if ((device->capabilities & MEDIA_REMOTE)  != 0) {
-      PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_NEC), Py_BuildValue("s", "NEC"));
+      PyDict_SetItemString(ir_protocols, "NEC", PyLong_FromLong(IR_PROTO_NEC));
 
       if (!only_NEC_support((char*)device->frontend_node)) {
-         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC5),        Py_BuildValue("s", "RC5"));
-         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC6_MODE0),  Py_BuildValue("s", "RC6"));
-         PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_RC6_MODE6A), Py_BuildValue("s", "RC6A"));
+         PyDict_SetItemString(ir_protocols, "RC5",  PyLong_FromLong(IR_PROTO_RC5)       );
+         PyDict_SetItemString(ir_protocols, "RC6",  PyLong_FromLong(IR_PROTO_RC6_MODE0) );
+         PyDict_SetItemString(ir_protocols, "RC6A", PyLong_FromLong(IR_PROTO_RC6_MODE6A));
       }
    }
    PyDict_SetItemString(sundtek_device, "ir_protocols", ir_protocols);
