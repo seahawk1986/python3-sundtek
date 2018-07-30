@@ -6,7 +6,6 @@
 #include <unistd.h>
 
 #include <sundtek/mcsimple.h>
-#include <sundtek/mediacmds.h>
 #include <sundtek/mediaclient.h>
 
 #include "sundtek_api.h"
@@ -73,6 +72,46 @@ static PyObject *sundtek_api_disable_network(PyObject *self, PyObject *args) {
    net_close(fd);
    Py_RETURN_NONE;
 }
+
+static PyObject *sundtek_api_mount(PyObject *self, PyObject *args) {
+   const char *path;
+   if (!PyArg_ParseTuple(args, "s", &path))
+       return NULL;
+
+   int fd = connect_sundtek_mediasrv();
+   if (fd <= 0) {
+      PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
+      return (PyObject *) NULL;
+   }
+
+   int result = net_mount_device(path, MEDIA_MOUNT);
+   if (result != 0) {
+      PyErr_SetString(PyExc_ConnectionError, "mounting device failed");
+      return (PyObject *) NULL;
+   }
+   net_close(fd);
+   Py_RETURN_NONE;
+}
+
+static PyObject *sundtek_api_umount(PyObject *self, PyObject *args) {
+   const char *path;
+   if (!PyArg_ParseTuple(args, "s", &path))
+       return NULL;
+
+   int fd = connect_sundtek_mediasrv();
+   if (fd <= 0) {
+      PyErr_SetString(PyExc_ConnectionError, "connecting to mediasrv failed");
+      return (PyObject *) NULL;
+   }
+
+   int result = net_mount_device(path, MEDIA_UNMOUNT);
+   if (result != 0) {
+      PyErr_SetString(PyExc_ConnectionError, "mounting device failed");
+      return (PyObject *) NULL;
+   }
+   net_close(fd);
+   Py_RETURN_NONE;
+}
 //Method definition object for this extension, these argumens mean:
 //ml_name: The name of the method
 //ml_meth: Function pointer to the method implementation
@@ -103,6 +142,18 @@ static PyMethodDef sundtek_api_methods[] = {
 	sundtek_api_disable_network,
 	METH_NOARGS,
 	"disable network sharing of local sundtek devices"
+    },
+    {
+        "mount",
+	sundtek_api_mount,
+	METH_VARARGS,
+	"mount a network device"
+    },
+    {
+        "umount",
+	sundtek_api_umount,
+	METH_VARARGS,
+	"umount a network device"
     },
     /*
     {   "is_local_device",
