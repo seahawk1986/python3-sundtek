@@ -106,12 +106,13 @@ static PyObject *sundtek_api_umount(PyObject *self, PyObject *args) {
 
    int result = net_mount_device(path, MEDIA_UNMOUNT);
    if (result != 0) {
-      PyErr_SetString(PyExc_ConnectionError, "mounting device failed");
+      PyErr_SetString(PyExc_ConnectionError, "umounting device failed");
       return (PyObject *) NULL;
    }
    net_close(fd);
    Py_RETURN_NONE;
 }
+
 //Method definition object for this extension, these argumens mean:
 //ml_name: The name of the method
 //ml_meth: Function pointer to the method implementation
