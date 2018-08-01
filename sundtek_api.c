@@ -402,8 +402,9 @@ int only_NEC_support(char *frontend_node) {
     *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
     *  - newer sticks only support their NEC using a hardware decoder
     *
-    *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume that we got a newer stick
-    *  else that for more protocols are supported
+    *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume
+    *  that we got a newer stick with a hardware decoder
+    *  else that we can use the software decoder and more protocols are supported
     */
 
    int fd = net_open(frontend_node, O_RDWR);
