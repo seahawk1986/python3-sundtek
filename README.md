@@ -22,4 +22,7 @@ sundtek_api.mount("192.168.1.104:0")
 
 # umount a remote sundtek device with given IP and device ID
 sundtek_api.umount("192.168.1.104:0")
+
+# get the active and supported ir protocols from a frontend node
+sundtek_api.ir_protocols("/dev/dvb/adapter0/frontend0")
 ```
