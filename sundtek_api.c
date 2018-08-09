@@ -19,6 +19,12 @@
 #define NETWORK_DEVICE 2
 #define MOUNTED_NETWORK_DEVICE 4
 
+// define module constants
+const char *NAME_IR_PROTO_NEC        = "IR_PROTO_NEC";
+const char *NAME_IR_PROTO_RC5        = "IR_PROTO_RC5";
+const char *NAME_IR_PROTO_RC6_MODE0  = "IR_PROTO_RC6_MODE0"; 
+const char *NAME_IR_PROTO_RC6_MODE6A = "IR_PROTO_RC6_MODE6A";
+
 // Actual module method definition - this is the code that will be called by
 // sundtek.local_devices() in python
 static PyObject *sundtek_api_local_devices(PyObject *self, PyObject *args)
@@ -219,7 +225,30 @@ PyMODINIT_FUNC PyInit_sundtek_api(void)
 {
     Py_Initialize();
 
-    return PyModule_Create(&sundtek_api_definition);
+    PyObject *m = NULL;
+    m = PyModule_Create(&sundtek_api_definition);
+    if (m == NULL) {
+       goto except;
+    }
+
+    if (PyModule_AddIntConstant(m, NAME_IR_PROTO_NEC, IR_PROTO_NEC)) {
+       goto except;
+    }
+    if (PyModule_AddIntConstant(m, NAME_IR_PROTO_RC5, IR_PROTO_RC5)) {
+       goto except;
+    }
+    if (PyModule_AddIntConstant(m, NAME_IR_PROTO_RC6_MODE0, IR_PROTO_RC6_MODE0)) {
+       goto except;
+    }
+    if (PyModule_AddIntConstant(m, NAME_IR_PROTO_RC6_MODE6A, IR_PROTO_RC6_MODE6A)) {
+       goto except;
+    }
+    goto finally;
+except:
+    Py_XDECREF(m);
+    m = NULL;
+finally:
+    return m;
 }
 
 // helper functions (actual implementation of the c api calls)
