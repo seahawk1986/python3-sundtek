@@ -84,7 +84,7 @@ static PyObject *sundtek_api_mount(PyObject *self, PyObject *args) {
       return (PyObject *) NULL;
    }
 
-   int result = net_mount_device(path, MEDIA_MOUNT);
+   int result = net_mount_device((uint8_t *)path, MEDIA_MOUNT);
    if (result != 0) {
       PyErr_SetString(PyExc_ConnectionError, "mounting device failed");
       return (PyObject *) NULL;
@@ -104,13 +104,41 @@ static PyObject *sundtek_api_umount(PyObject *self, PyObject *args) {
       return (PyObject *) NULL;
    }
 
-   int result = net_mount_device(path, MEDIA_UNMOUNT);
+   int result = net_mount_device((uint8_t*)path, MEDIA_UNMOUNT);
    if (result != 0) {
       PyErr_SetString(PyExc_ConnectionError, "umounting device failed");
       return (PyObject *) NULL;
    }
    net_close(fd);
    Py_RETURN_NONE;
+}
+
+static PyObject *sundtek_get_ir_protocols(PyObject *self, PyObject *args) {
+   char *path;
+   if (!PyArg_ParseTuple(args, "s", &path))
+       return NULL;
+
+   PyObject *ir_settings = PyDict_New();
+   PyDict_SetItemString(ir_settings, "active_ir_protocol", Py_BuildValue("i", 0));
+
+   PyObject *ir_protocols = PyDict_New();
+   PyDict_SetItem(ir_protocols, PyLong_FromLong(IR_PROTO_NEC), Py_BuildValue("s", "NEC (hardware decoder)"));
+
+   int dev_fd = net_open(path, O_RDWR);
+   if (dev_fd >= 0) {
+      struct media_ir_enum ir;
+      int8_t ret = 0;
+      memset(&ir, 0x0, sizeof(struct media_ir_enum));
+
+      while((ret=net_ioctl(dev_fd, DEVICE_ENUM_IR, &ir)) == 0) {
+         if (ir.active) PyDict_SetItemString(ir_settings, "active_ir_protocol", Py_BuildValue("i", ir.id));
+         PyDict_SetItem(ir_protocols, PyLong_FromLong(ir.id), Py_BuildValue("s", (char*)ir.name));
+         ir.id++;
+      }
+      net_close(dev_fd);
+   }
+   PyDict_SetItemString(ir_settings, "ir_protocols", ir_protocols);
+   return ir_settings;
 }
 
 //Method definition object for this extension, these argumens mean:
@@ -155,6 +183,12 @@ static PyMethodDef sundtek_api_methods[] = {
 	sundtek_api_umount,
 	METH_VARARGS,
 	"umount a network device"
+    },
+    {
+        "ir_protocols",
+        sundtek_get_ir_protocols,
+        METH_VARARGS,
+        "return ir protocols settings for a frontend node"
     },
     /*
     {   "is_local_device",
@@ -354,17 +388,6 @@ void device2dict(struct media_device_enum *device, PyObject *local_devices) {
    PyDict_SetItemString(sundtek_device, "remote_node",   Py_BuildValue("s", (char*)device->remote_node));
    PyDict_SetItemString(sundtek_device, "serial",        Py_BuildValue("s", (char*)device->serial));
 
-   PyObject *ir_protocols = PyDict_New();
-   if ((device->capabilities & MEDIA_REMOTE)  != 0) {
-      PyDict_SetItemString(ir_protocols, "NEC", PyLong_FromLong(IR_PROTO_NEC));
-
-      if (!only_NEC_support((char*)device->frontend_node)) {
-         PyDict_SetItemString(ir_protocols, "RC5",  PyLong_FromLong(IR_PROTO_RC5)       );
-         PyDict_SetItemString(ir_protocols, "RC6",  PyLong_FromLong(IR_PROTO_RC6_MODE0) );
-         PyDict_SetItemString(ir_protocols, "RC6A", PyLong_FromLong(IR_PROTO_RC6_MODE6A));
-      }
-   }
-   PyDict_SetItemString(sundtek_device, "ir_protocols", ir_protocols);
 
    PyDict_SetItemString(local_devices, (char*)device->serial, sundtek_device);
 }
@@ -373,7 +396,7 @@ int set_ir_protocol(int ir_protocol, char *frontend_node) {
    /*
     * takes the ir protocol number and the frontend node
     * to set the ir protocol (this can fail without error,
-    * if the device does not support setting a valid protocol).
+    * if the device does not support setting a protocol).
     */
 
 
@@ -384,35 +407,8 @@ int set_ir_protocol(int ir_protocol, char *frontend_node) {
       ir_config.nec_parity = 0;
       ir_config.rc6_mode = 0;
       int response = net_ioctl(fd, DEVICE_CONFIG_IR, &ir_config);
-      /*
-      printf("response settings protocol: %d\n"
-             " - data.protocol: %d\n"
-             " - data.nec_parity: %d\n"
-             " - data.rc6_mode: %d\n", response, ir_config.protocol, ir_config.nec_parity, ir_config.rc6_mode);
-      */
       net_close(fd);
       return (response == 0);
    }
    return 0;
-}
-
-int only_NEC_support(char *frontend_node) {
-   /*
-    * As far as I understand there are two possibilites:
-    *  - older sticks with a software decoder support NEC, RC5, RC6 and RC6A
-    *  - newer sticks only support their NEC using a hardware decoder
-    *
-    *  So if the ioctl operation for DEVICE_ENUM_IR fails, we assume
-    *  that we got a newer stick with a hardware decoder
-    *  else that we can use the software decoder and more protocols are supported
-    */
-
-   int fd = net_open(frontend_node, O_RDWR);
-   if (fd >0) {
-       struct media_ir_enum ir_enum[8]; // for some reason the sundtek api wants an array with more than one element
-       int response = net_ioctl(fd, DEVICE_ENUM_IR, &ir_enum);
-       net_close(fd);
-       return (response != 0);
-       }
-   return 1;
 }

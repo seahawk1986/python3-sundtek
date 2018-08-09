@@ -7,6 +7,9 @@ except (ConnectionError):
     pass
 else:
     print("Local Devices:")
+    for device in devices.values():
+        if device.get('remote_node'):
+            device.update(sundtek_api.ir_protocols(device.get('frontend_node')))
     print(devices)
 
 print("Network Devices:")
