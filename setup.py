@@ -12,6 +12,6 @@ setup(
     version='1.0',
     description='Python Package which wraps some mediasrv api functions',
     ext_modules=[sundtek],
-    url='http://adamlamers.com',
+    url='https://github.com/seahawk1986/python3_sundtek',
     author='Alexander Grothe',
     author_email='alexander.grothe at gmail dot com')
