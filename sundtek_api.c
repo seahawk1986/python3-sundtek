@@ -147,6 +147,23 @@ static PyObject *sundtek_get_ir_protocols(PyObject *self, PyObject *args) {
    return ir_settings;
 }
 
+static PyObject *sundtek_set_ir_protocol(PyObject *self, PyObject *args) {
+   char *path;
+   int  protocol;
+   if (!PyArg_ParseTuple(args, "si", &path, &protocol))
+       return NULL;
+   int dev_fd = net_open(path, O_RDWR);
+   if (dev_fd >= 0) {
+       int resp = set_ir_protocol(protocol, path);
+       if (!resp) {
+           PyErr_SetString(PyExc_ValueError, "Could not set ir protocol");
+           return NULL;
+       }
+   }
+   net_close(dev_fd);
+   Py_RETURN_NONE;
+}
+
 //Method definition object for this extension, these argumens mean:
 //ml_name: The name of the method
 //ml_meth: Function pointer to the method implementation
@@ -195,6 +212,12 @@ static PyMethodDef sundtek_api_methods[] = {
         sundtek_get_ir_protocols,
         METH_VARARGS,
         "return ir protocols settings for a frontend node"
+    },
+    {
+        "set_ir_protocol",
+	sundtek_set_ir_protocol,
+	METH_VARARGS,
+	"set ir protocol settings for a frontend node.\n\nThis may fail without raising an error."
     },
     /*
     {   "is_local_device",
