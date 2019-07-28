@@ -11,6 +11,7 @@ setup(
     name='sundtek_api',
     version='1.0',
     description='Python Package which wraps some mediasrv api functions',
+    py_modules=['sundtekdevice'],
     ext_modules=[sundtek],
     url='https://github.com/seahawk1986/python3_sundtek',
     author='Alexander Grothe',
