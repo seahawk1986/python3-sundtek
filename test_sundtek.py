@@ -26,6 +26,14 @@ else:
                     else:
                         if not sundtek_api.ir_protocols(data.get('frontend_node')).get('active_ir_protocol') == ir_protocol:
                             print(f"Could not set protocol to {description} ({ir_protocol})", file=sys.stderr)
+                        else:
+                            print(f"Successfully changed ir-protocol to {description} ({ir_protocol})")
+                    try:
+                        sundtek_api.set_ir_protocol(data.get('frontend_node'), data.get('active_ir_protocol', 0))
+                    except ValueError as e:
+                        print(e, file=sys.stderr)
+                    else:
+                        print(f"reset ir-protocol to {data.get('active_ir_protocol', 0)}")
 
 print("Network Devices:")
 print(sundtek_api.network_devices())
